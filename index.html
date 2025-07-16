@@ -221,7 +221,17 @@
                 </div>
             </section>
 
-            <section id="ai-caddie" class="glass-card p-6 md:p-8 rounded-2xl mb-12 fade-in" style="animation-delay: 0.3s;">
+            <section id="api-key-section" class="glass-card p-6 md:p-8 rounded-2xl mb-12 fade-in" style="animation-delay: 0.3s;">
+                <h2 class="text-2xl font-bold mb-2 text-emerald-400">API Key Required</h2>
+                <p class="text-gray-300 mb-4">To use the AI Caddie, please provide your free Google Gemini API key. It will be saved securely in your browser.</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="password" id="api-key-input" placeholder="Paste your API Key here" class="flex-grow p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition">
+                    <button id="save-key-button" class="gemini-button font-bold py-3 px-4 rounded-lg">Save Key</button>
+                </div>
+                 <p class="text-sm text-gray-400 mt-2">Don't have a key? <a href="https://aistudio.google.com/app/apikey" target="_blank" class="underline hover:text-emerald-400">Get one from Google AI Studio</a>.</p>
+            </section>
+
+            <section id="ai-caddie" class="glass-card p-6 md:p-8 rounded-2xl mb-12 fade-in hidden" style="animation-delay: 0.3s;">
                 <h2 class="text-2xl font-bold text-center mb-4">✨ Find Your Perfect Ball</h2>
                 <p class="text-center text-gray-300 mb-4">Describe your game (e.g., "I have a bad slice," "I need more distance," "I want a soft feel") and we'll give a recommendation.</p>
                 <textarea id="player-description" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition" rows="3" placeholder="e.g., I usually hit straight, but not very far..."></textarea>
@@ -246,7 +256,7 @@
         </main>
 
         <footer class="text-center mt-16 mb-8">
-            <p class="text-sm text-gray-500">Powered by Google Gemini. Designed for a bettter round.</p>
+            <p class="text-sm text-gray-500">Powered by Google Gemini. Designed for a better round.</p>
         </footer>
 
     </div>
@@ -366,10 +376,10 @@
         ];
 
         let myChart;
+        let apiKey = '';
 
-        async function callGeminiAPI(prompt) {
-            const apiKey = ""; 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        async function callGeminiAPI(prompt, key) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
             
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -418,7 +428,38 @@
             }
         }
 
+        function setupApiKey() {
+            const apiKeyInput = document.getElementById('api-key-input');
+            const saveKeyButton = document.getElementById('save-key-button');
+            const apiKeySection = document.getElementById('api-key-section');
+            const aiCaddieSection = document.getElementById('ai-caddie');
+
+            apiKey = localStorage.getItem('geminiApiKey');
+
+            if (apiKey) {
+                apiKeySection.classList.add('hidden');
+                aiCaddieSection.classList.remove('hidden');
+            } else {
+                apiKeySection.classList.remove('hidden');
+                aiCaddieSection.classList.add('hidden');
+            }
+
+            saveKeyButton.addEventListener('click', () => {
+                const newKey = apiKeyInput.value.trim();
+                if (newKey) {
+                    localStorage.setItem('geminiApiKey', newKey);
+                    apiKey = newKey;
+                    apiKeySection.classList.add('hidden');
+                    aiCaddieSection.classList.remove('hidden');
+                    alert('API Key saved successfully!');
+                } else {
+                    alert('Please enter a valid API Key.');
+                }
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
+            setupApiKey();
             createChart();
             populateNav();
             updateView(ballData.find(b => b.rank === 1).id); // Show the #1 ball by default
@@ -441,6 +482,11 @@
         }
 
         async function handleCaddieRecommendation() {
+            if (!apiKey) {
+                alert('Please save your API key first.');
+                return;
+            }
+
             const userInput = document.getElementById('player-description').value;
             const caddieSection = document.getElementById('caddie-recommendation');
             
@@ -461,7 +507,7 @@ ${ballProfilesForPrompt}
 Respond with ONLY a JSON object containing the ID of the recommended ball, like this:
 {"id": 2}`;
 
-            const rawResponse = await callGeminiAPI(prompt);
+            const rawResponse = await callGeminiAPI(prompt, apiKey);
             let recommendedBall = null;
 
             try {
@@ -474,7 +520,6 @@ Respond with ONLY a JSON object containing the ID of the recommended ball, like 
                 }
             } catch (e) {
                 console.error("Failed to parse JSON from AI response, falling back to name search.", e, "Raw response:", rawResponse);
-                // Fallback: If JSON parsing fails, try to find a ball name in the raw text
                 recommendedBall = ballData.find(b => rawResponse.toLowerCase().includes(b.name.toLowerCase()));
             }
 

@@ -8,23 +8,23 @@
     <title>Golf Ball Selector for High-Handicappers | Pro Insights & AI</title>
     <meta name="description" content="The ultimate tool for high-handicappers to find the right golf ball. Combines decades of a veteran pro's knowledge with AI precision for personalized recommendations.">
     <meta name="keywords" content="golf balls, best golf balls, golf ball reviews, high-handicap golf balls, golf ball selector, AI golf caddie, Callaway Supersoft, Titleist TruFeel, TaylorMade Distance+, Srixon Soft Feel, Wilson DUO Soft, golf 2025">
-    <link rel="canonical" href="https://www.your-domain.com/">
+    <link rel="canonical" href="https://reviews4u.github.io/golf-ball-selector/">
 
     <!-- Open Graph / Facebook Meta Tags -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://www.your-domain.com/">
+    <meta property="og:url" content="https://reviews4u.github.io/golf-ball-selector/">
     <meta property="og:title" content="Golf Ball Selector for High-Handicappers | Pro Insights & AI">
     <meta property="og:description" content="Combines a veteran pro's knowledge with AI precision to find the perfect ball for your game.">
     <!-- VAIHDA TÄHÄN SOME-JAKOA VARTEN TARKOITETUN KUVAN OSOITE -->
-    <meta property="og:image" content="https://www.your-domain.com/pro-image.jpg">
+    <meta property="og:image" content="https://reviews4u.github.io/golf-ball-selector/pro-image.jpg">
 
     <!-- Twitter Meta Tags -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://www.your-domain.com/">
+    <meta property="twitter:url" content="https://reviews4u.github.io/golf-ball-selector/">
     <meta property="twitter:title" content="Golf Ball Selector for High-Handicappers | Pro Insights & AI">
     <meta property="twitter:description" content="Combines a veteran pro's knowledge with AI precision to find the perfect ball for your game.">
     <!-- VAIHDA TÄHÄN SOME-JAKOA VARTEN TARKOITETUN KUVAN OSOITE -->
-    <meta property="twitter:image" content="https://www.your-domain.com/pro-image.jpg">
+    <meta property="twitter:image" content="https://reviews4u.github.io/golf-ball-selector/pro-image.jpg">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -451,23 +451,34 @@
             caddieSection.innerHTML = '<div class="loader"></div>';
             caddieSection.classList.remove('hidden');
 
-            const ballProfilesForPrompt = ballData.map(b => `'${b.name}': which is best for ${b.summary}`).join('\n');
+            const ballProfilesForPrompt = ballData.map(b => `ID ${b.id}: '${b.name}' (Best for: ${b.summary})`).join('\n');
             const prompt = `You are an expert golf caddie. A player describes their game: "${userInput}".
-From the following list, which single golf ball is the best fit for them?
-List of balls and their key strengths:
+From the following list, which single golf ball is the best fit?
+List of balls with their IDs and key strengths:
 ${ballProfilesForPrompt}
 
-Respond with ONLY the name of the recommended ball and nothing else. For example: Callaway Supersoft`;
+Respond with ONLY a JSON object containing the ID of the recommended ball, like this:
+{"id": 2}`;
 
-            const recommendedBallName = await callGeminiAPI(prompt);
-            const recommendedBall = ballData.find(b => recommendedBallName.toLowerCase().trim().includes(b.name.toLowerCase()));
+            const jsonResponse = await callGeminiAPI(prompt);
+            
+            try {
+                const cleanedJson = jsonResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+                const responseObject = JSON.parse(cleanedJson);
+                const recommendedId = responseObject.id;
+                const recommendedBall = ballData.find(b => b.id === recommendedId);
 
-            if (recommendedBall) {
-                caddieSection.innerHTML = `<p class="text-lg text-gray-200">Based on your game, I recommend the <strong>${recommendedBall.name}</strong>. It's an excellent choice for players seeking ${recommendedBall.summary.toLowerCase().replace('best for ', '')}.</p>`;
-                updateView(recommendedBall.id);
-                document.getElementById('comparison-dashboard').scrollIntoView({ behavior: 'smooth' });
-            } else {
-                caddieSection.innerHTML = `<p class="text-lg text-gray-200">Sorry, I couldn't match the AI's response to a specific ball. Please try rephrasing your description.</p>`;
+                if (recommendedBall) {
+                    caddieSection.innerHTML = `<p class="text-lg text-gray-200">Based on your game, I recommend the <strong>${recommendedBall.name}</strong>. It's an excellent choice for players seeking ${recommendedBall.summary.toLowerCase().replace('best for ', '')}.</p>`;
+                    updateView(recommendedBall.id);
+                    document.getElementById('comparison-dashboard').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                     caddieSection.innerHTML = `<p class="text-lg text-gray-200">Sorry, the AI recommended an invalid ball ID. Please try again.</p>`;
+                }
+
+            } catch (e) {
+                console.error("Failed to parse JSON from AI response:", e, "Raw response:", jsonResponse);
+                caddieSection.innerHTML = `<p class="text-lg text-gray-200">Sorry, the AI returned an invalid format. Please try rephrasing your description.</p>`;
             }
         }
         

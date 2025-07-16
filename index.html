@@ -374,9 +374,8 @@
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
-                    temperature: 0.5,
+                    temperature: 0.4,
                     maxOutputTokens: 1024,
-                    responseMimeType: "application/json",
                 },
                 safetySettings: [
                     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -461,29 +460,37 @@ ${ballProfilesForPrompt}
 Respond with ONLY a JSON object containing the ID of the recommended ball, like this:
 {"id": 2}`;
 
-            const jsonResponse = await callGeminiAPI(prompt);
-            
+            const rawResponse = await callGeminiAPI(prompt);
+            let recommendedBall = null;
+
             try {
-                const responseObject = JSON.parse(jsonResponse);
-                
-                if(responseObject.error) {
-                    throw new Error(responseObject.error);
+                // Method 1: Try to find and parse a JSON object from the response.
+                const jsonMatch = rawResponse.match(/{[\s\S]*}/);
+                if (jsonMatch) {
+                    const responseObject = JSON.parse(jsonMatch[0]);
+                    if (responseObject.id !== undefined) {
+                        recommendedBall = ballData.find(b => b.id === responseObject.id);
+                    }
                 }
 
-                const recommendedId = responseObject.id;
-                const recommendedBall = ballData.find(b => b.id === recommendedId);
-
-                if (recommendedBall) {
-                    caddieSection.innerHTML = `<p class="text-lg text-gray-200">Based on your game, I recommend the <strong>${recommendedBall.name}</strong>. It's an excellent choice for players seeking ${recommendedBall.summary.toLowerCase().replace('best for ', '')}.</p>`;
-                    updateView(recommendedBall.id);
-                    document.getElementById('comparison-dashboard').scrollIntoView({ behavior: 'smooth' });
-                } else {
-                     caddieSection.innerHTML = `<p class="text-lg text-gray-200">Sorry, the AI recommended an invalid ball ID. Please try again.</p>`;
+                // Method 2: If JSON parsing fails or finds no ID, fall back to name search.
+                if (!recommendedBall) {
+                    console.warn("Could not find valid JSON with an ID, falling back to name search.");
+                    recommendedBall = ballData.find(b => rawResponse.toLowerCase().includes(b.name.toLowerCase()));
                 }
-
             } catch (e) {
-                console.error("Failed to parse JSON from AI response:", e, "Raw response:", jsonResponse);
-                caddieSection.innerHTML = `<p class="text-lg text-gray-200">Sorry, the AI returned an invalid format. Please try rephrasing your description.</p>`;
+                // Method 3: If even the robust search fails, try a simple name search as a last resort.
+                console.error("Error processing AI response, attempting final fallback.", e);
+                recommendedBall = ballData.find(b => rawResponse.toLowerCase().includes(b.name.toLowerCase()));
+            }
+
+            if (recommendedBall) {
+                caddieSection.innerHTML = `<p class="text-lg text-gray-200">Based on your game, I recommend the <strong>${recommendedBall.name}</strong>. It's an excellent choice for players seeking ${recommendedBall.summary.toLowerCase().replace('best for ', '')}.</p>`;
+                updateView(recommendedBall.id);
+                document.getElementById('comparison-dashboard').scrollIntoView({ behavior: 'smooth' });
+            } else {
+                console.error("Could not determine recommended ball from response:", rawResponse);
+                caddieSection.innerHTML = `<p class="text-lg text-gray-200">Sorry, I couldn't match the AI's response to a specific ball. Please try rephrasing your description.</p>`;
             }
         }
         

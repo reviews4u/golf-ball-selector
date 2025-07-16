@@ -376,6 +376,7 @@
                 generationConfig: {
                     temperature: 0.5,
                     maxOutputTokens: 1024,
+                    responseMimeType: "application/json",
                 },
                 safetySettings: [
                     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -404,16 +405,16 @@
                     if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
                         return candidate.content.parts[0].text;
                     } else if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-                         return `The AI response was incomplete. Reason: ${candidate.finishReason}. Please try again.`;
+                         return `{"error": "The AI response was incomplete. Reason: ${candidate.finishReason}"}`;
                     }
                 }
                 
                 console.error("Gemini API returned an unexpected response structure:", result);
-                return "Sorry, the AI Caddie couldn't generate a response. The model returned an empty or invalid answer. Please try again.";
+                return `{"error": "Sorry, the AI Caddie couldn't generate a response."}`;
 
             } catch (error) {
                 console.error("Gemini API Error:", error);
-                return `An error occurred while contacting the AI Caddie. Please check the console for details. Error: ${error.message}`;
+                return `{"error": "An error occurred while contacting the AI Caddie. Details: ${error.message}"}`;
             }
         }
 
@@ -463,8 +464,12 @@ Respond with ONLY a JSON object containing the ID of the recommended ball, like 
             const jsonResponse = await callGeminiAPI(prompt);
             
             try {
-                const cleanedJson = jsonResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-                const responseObject = JSON.parse(cleanedJson);
+                const responseObject = JSON.parse(jsonResponse);
+                
+                if(responseObject.error) {
+                    throw new Error(responseObject.error);
+                }
+
                 const recommendedId = responseObject.id;
                 const recommendedBall = ballData.find(b => b.id === recommendedId);
 
